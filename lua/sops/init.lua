@@ -1,6 +1,6 @@
 -- init.lua - Main SOPS plugin logic
 
-local utils = require('nvim_sops.utils')
+local utils = require('sops.utils')
 
 local M = {}
 

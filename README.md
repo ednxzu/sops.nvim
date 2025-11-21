@@ -1,4 +1,4 @@
-# nvim_sops
+# sops.nvim
 
 A Neovim plugin for transparent encryption and decryption of [SOPS](https://github.com/mozilla/sops)-encrypted files.
 
@@ -24,7 +24,7 @@ A Neovim plugin for transparent encryption and decryption of [SOPS](https://gith
 **Default configuration (automatic mode):**
 ```lua
 {
-  'atmask/nvim_sops',
+  'atmask/sops.nvim',
   ft = { 'yaml', 'json' },  -- Lazy load on YAML/JSON files
 }
 ```
@@ -32,7 +32,7 @@ A Neovim plugin for transparent encryption and decryption of [SOPS](https://gith
 **Custom configuration (manual mode with keybindings):**
 ```lua
 {
-  'atmask/nvim_sops',
+  'atmask/sops.nvim',
   ft = { 'yaml', 'json' },
   opts = {
     auto_decrypt = false,
@@ -49,7 +49,7 @@ A Neovim plugin for transparent encryption and decryption of [SOPS](https://gith
 
 ```lua
 use {
-  'atmask/nvim_sops',
+  'atmask/sops.nvim',
   ft = { 'yaml', 'json' },
 }
 ```
@@ -57,7 +57,7 @@ use {
 ### Using [vim-plug](https://github.com/junegunn/vim-plug)
 
 ```vim
-Plug 'atmask/nvim_sops'
+Plug 'atmask/sops.nvim'
 ```
 
 ### Manual Installation
@@ -65,7 +65,7 @@ Plug 'atmask/nvim_sops'
 Clone this repository into your Neovim plugin directory:
 
 ```bash
-git clone https://github.com/atmask/nvim_sops.git ~/.local/share/nvim/site/pack/plugins/start/nvim_sops
+git clone https://github.com/atmask/sops.nvim.git ~/.local/share/nvim/site/pack/plugins/start/sops.nvim
 ```
 
 ## Configuration
@@ -73,7 +73,7 @@ git clone https://github.com/atmask/nvim_sops.git ~/.local/share/nvim/site/pack/
 By default, the plugin automatically decrypts files when opened and re-encrypts them when saved. You can customize this behavior using the `setup()` function:
 
 ```lua
-require('nvim_sops').setup({
+require('sops').setup({
   -- Enable automatic decryption when opening files (default: true)
   auto_decrypt = true,
   -- Enable automatic encryption when saving files (default: true)
@@ -86,7 +86,7 @@ require('nvim_sops').setup({
 If you prefer manual control, disable automatic operations and use commands/keybindings instead:
 
 ```lua
-require('nvim_sops').setup({
+require('sops').setup({
   auto_decrypt = false,
   auto_encrypt = false,
 })
