@@ -1,0 +1,109 @@
+-- init.lua - Main SOPS plugin logic
+
+local utils = require('nvim_sops.utils')
+
+local M = {}
+
+--- Decrypt a buffer if it contains SOPS-encrypted content
+---@param bufnr number Buffer number
+function M.decrypt_buffer(bufnr)
+  -- Check if sops is available
+  if not utils.has_sops() then
+    vim.notify('sops command not found. Please install sops.', vim.log.levels.WARN)
+    return
+  end
+  
+  -- Check if the buffer contains SOPS metadata
+  if not utils.is_sops_file(bufnr) then
+    return
+  end
+  
+  -- Get buffer content
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local encrypted_content = table.concat(lines, '\n')
+  
+  -- Get file format
+  local format = utils.get_file_format(bufnr)
+  
+  -- Decrypt the content
+  local success, result = utils.execute_sops({ '--decrypt', '--input-type', format, '--output-type', format, '/dev/stdin' }, encrypted_content)
+  
+  if success then
+    -- Split the result into lines and update the buffer
+    local decrypted_lines = vim.split(result, '\n', { plain = true })
+    
+    -- Remove the last empty line if present
+    if decrypted_lines[#decrypted_lines] == '' then
+      table.remove(decrypted_lines)
+    end
+    
+    -- Update buffer with decrypted content
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, decrypted_lines)
+    
+    -- Mark buffer as originally encrypted
+    vim.api.nvim_buf_set_var(bufnr, 'is_sops_encrypted', true)
+    
+    -- Mark buffer as not modified (since we just read it)
+    vim.api.nvim_buf_set_option(bufnr, 'modified', false)
+    
+    vim.notify('SOPS file decrypted successfully', vim.log.levels.INFO)
+  else
+    -- Decryption failed - keep encrypted content and show error
+    vim.notify('Failed to decrypt SOPS file: ' .. result, vim.log.levels.ERROR)
+  end
+end
+
+--- Encrypt a buffer before saving if it was originally encrypted
+---@param bufnr number Buffer number
+function M.encrypt_buffer(bufnr)
+  -- Check if this buffer was originally encrypted
+  local ok, is_encrypted = pcall(vim.api.nvim_buf_get_var, bufnr, 'is_sops_encrypted')
+  if not ok or not is_encrypted then
+    return
+  end
+  
+  -- Check if sops is available
+  if not utils.has_sops() then
+    vim.notify('sops command not found. Cannot encrypt file.', vim.log.levels.ERROR)
+    return
+  end
+  
+  -- Get buffer content
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local decrypted_content = table.concat(lines, '\n')
+  
+  -- Get file format
+  local format = utils.get_file_format(bufnr)
+  
+  -- Get the filename for in-place encryption
+  local filename = vim.api.nvim_buf_get_name(bufnr)
+  
+  -- Encrypt the content
+  -- We use --input-type and --output-type with /dev/stdin instead of in-place
+  -- because we want to update the buffer, not the file directly
+  local success, result = utils.execute_sops({ '--encrypt', '--input-type', format, '--output-type', format, '/dev/stdin' }, decrypted_content)
+  
+  if success then
+    -- Split the result into lines and update the buffer
+    local encrypted_lines = vim.split(result, '\n', { plain = true })
+    
+    -- Remove the last empty line if present
+    if encrypted_lines[#encrypted_lines] == '' then
+      table.remove(encrypted_lines)
+    end
+    
+    -- Update buffer with encrypted content
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, encrypted_lines)
+    
+    vim.notify('SOPS file encrypted successfully', vim.log.levels.INFO)
+  else
+    -- Encryption failed - show error and prevent save
+    vim.notify('Failed to encrypt SOPS file: ' .. result, vim.log.levels.ERROR)
+    
+    -- Throw an error to prevent the write
+    error('SOPS encryption failed')
+  end
+end
+
+return M
+
