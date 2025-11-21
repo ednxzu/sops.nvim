@@ -16,6 +16,33 @@ M.config = {
 ---@param opts table|nil Configuration options
 function M.setup(opts)
   M.config = vim.tbl_deep_extend('force', M.config, opts or {})
+  
+  -- Create autocommand group for SOPS operations
+  local group = vim.api.nvim_create_augroup('Sops', { clear = true })
+  
+  -- Set up automatic decryption if enabled
+  if M.config.auto_decrypt then
+    vim.api.nvim_create_autocmd('BufReadPost', {
+      group = group,
+      pattern = { '*.yaml', '*.yml', '*.json' },
+      callback = function(args)
+        M.decrypt_buffer(args.buf)
+      end,
+      desc = 'Decrypt SOPS files on open',
+    })
+  end
+  
+  -- Set up automatic encryption if enabled
+  if M.config.auto_encrypt then
+    vim.api.nvim_create_autocmd('BufWritePre', {
+      group = group,
+      pattern = { '*.yaml', '*.yml', '*.json' },
+      callback = function(args)
+        M.encrypt_buffer(args.buf)
+      end,
+      desc = 'Encrypt SOPS files before save',
+    })
+  end
 end
 
 --- Manually decrypt the current buffer (for use with keybindings)
