@@ -26,7 +26,12 @@ function M.setup(opts)
       group = group,
       pattern = { '*.yaml', '*.yml', '*.json' },
       callback = function(args)
-        M.decrypt_buffer(args.buf)
+        -- Deferred: on the very first file of a session, BufReadPost can fire
+        -- before Neovim's startup window/focus sequence settles, which steals
+        -- focus back from the decrypt popup right after it opens.
+        vim.schedule(function()
+          M.decrypt_buffer(args.buf)
+        end)
       end,
       desc = 'Decrypt SOPS files on open',
     })
@@ -72,32 +77,37 @@ function M.decrypt_buffer(bufnr)
   -- Get file format
   local format = utils.get_file_format(bufnr)
   
-  -- Decrypt the content
-  local success, result = utils.execute_sops({ '--decrypt', '--input-type', format, '--output-type', format, '/dev/stdin' }, encrypted_content)
-  
-  if success then
-    -- Split the result into lines and update the buffer
-    local decrypted_lines = vim.split(result, '\n', { plain = true })
-    
-    -- Remove the last empty line if present
-    if decrypted_lines[#decrypted_lines] == '' then
-      table.remove(decrypted_lines)
+  -- Decrypt the content. Run interactively (real PTY) since age-plugin-yubikey
+  -- needs a terminal to prompt for the PIN; vim.fn.system() has no PTY.
+  utils.execute_sops_interactive(
+    { '--decrypt', '--input-type', format, '--output-type', format, '/dev/stdin' },
+    encrypted_content,
+    function(success, result)
+      if success then
+        -- Split the result into lines and update the buffer
+        local decrypted_lines = vim.split(result, '\n', { plain = true })
+
+        -- Remove the last empty line if present
+        if decrypted_lines[#decrypted_lines] == '' then
+          table.remove(decrypted_lines)
+        end
+
+        -- Update buffer with decrypted content
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, decrypted_lines)
+
+        -- Mark buffer as originally encrypted
+        vim.api.nvim_buf_set_var(bufnr, 'is_sops_encrypted', true)
+
+        -- Mark buffer as not modified (since we just read it)
+        vim.api.nvim_buf_set_option(bufnr, 'modified', false)
+
+        vim.notify('SOPS file decrypted successfully', vim.log.levels.INFO)
+      else
+        -- Decryption failed - keep encrypted content and show error
+        vim.notify('Failed to decrypt SOPS file: ' .. result, vim.log.levels.ERROR)
+      end
     end
-    
-    -- Update buffer with decrypted content
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, decrypted_lines)
-    
-    -- Mark buffer as originally encrypted
-    vim.api.nvim_buf_set_var(bufnr, 'is_sops_encrypted', true)
-    
-    -- Mark buffer as not modified (since we just read it)
-    vim.api.nvim_buf_set_option(bufnr, 'modified', false)
-    
-    vim.notify('SOPS file decrypted successfully', vim.log.levels.INFO)
-  else
-    -- Decryption failed - keep encrypted content and show error
-    vim.notify('Failed to decrypt SOPS file: ' .. result, vim.log.levels.ERROR)
-  end
+  )
 end
 
 --- Manually encrypt the current buffer (for use with keybindings)
